@@ -13,7 +13,6 @@ import (
 
 	"fyfe.io/dns/opcode"
 	"fyfe.io/dns/query"
-	"fyfe.io/dns/resource"
 )
 
 func main() {
@@ -25,15 +24,19 @@ func main() {
 	fmt.Printf("Listening on :%d\n", ip.Port)
 	defer conn.Close()
 
+	buf := make([]byte, 0)
+	tmp := make([]byte, 256)
 	for {
-		buf := make([]byte, 64)
-		len, err := conn.Read(buf)
+		l, err := conn.Read(tmp)
 		if err != nil {
 			if err != io.EOF {
 				log.Panic(err)
 			}
+			break
 		}
-		fmt.Printf("Read %d:\n%s", len, hex.Dump(buf))
+		buf = append(buf, tmp[:l]...)
+		fmt.Printf("Read %d\n%s\n", l, hex.Dump(buf))
+
 		fmt.Printf("%x", buf[0:2])
 		id := binary.BigEndian.Uint16(buf[0:2])
 		fmt.Printf("ID BE: %d\n", id)
@@ -53,24 +56,10 @@ func main() {
 		totalAuthorityRR := binary.BigEndian.Uint16(buf[8:10])
 		totalAdditionalRR := binary.BigEndian.Uint16(buf[10:12])
 
-		header := struct {
-			QR                 int           `json:"qr"`
-			Opcode             opcode.Opcode `json:"opcode"`
-			AuthorativeAnswer  bool          `json:"authorativeAnswer"`
-			Truncated          bool          `json:"truncated"`
-			RecursionDesired   bool          `json:"recursionDesired"`
-			RecursionAvailable bool          `json:"recursionAvailable"`
-			Z                  bool          `json:"z"`
-			AuthenticatedData  bool          `json:"authenticatedData"`
-			CheckingDisabled   bool          `json:"checkingDisabled"`
-			ReturnCode         int           `json:"returnCode"`
-			TotalQuestions     int           `json:"totalQuestions"`
-			TotalAnswerRR      int           `json:"totalAnswerRR"`
-			TotalAuthorityRR   int           `json:"totalAuthorityRR"`
-			TotalAdditionalRR  int           `json:"totalAdditionalRR"`
-		}{
+		header := &Header{
+			int(id),
 			int(qr),
-			opcode.Opcode(opCode),
+			int(opcode.Opcode(opCode)),
 			int(aa) == 1,
 			int(tc) == 1,
 			int(rd) == 1,
@@ -94,9 +83,6 @@ func main() {
 		query := query.ReadBytes(bufReader)
 		queryJson, _ := json.MarshalIndent(query, "", " ")
 		fmt.Printf("Query: %s\n", queryJson)
-
-		answers := resource.ReadBytes(bufReader)
-		resourceJson, _ := json.MarshalIndent(answers, "", " ")
-		fmt.Printf("Resource: %s\n", resourceJson)
 	}
+
 }
