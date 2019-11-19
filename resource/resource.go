@@ -64,12 +64,12 @@ func (r *Resource) ReadBytes(reader *bio.Reader) *Resource {
 	return resource
 }
 
-func packDomainName(b []byte, name string) {
+func packDomainName(b *[]byte, name string) {
 	parts := strings.Split(name, ".")
 
 	for i := 0; i < len(parts); i++ {
-		b = append(b, byte(len(parts[i])))
-		b = append(b, []byte(parts[i])...)
+		*b = append(*b, byte(len(parts[i])))
+		*b = append(*b, []byte(parts[i])...)
 	}
 }
 

@@ -1,11 +1,7 @@
 package query
 
 import (
-	bio "bufio"
 	"encoding/binary"
-	"log"
-
-	"fyfe.io/dns/bufio"
 )
 
 type QueryType int
@@ -34,13 +30,11 @@ type Query struct {
 	Class QueryClass `json:"class"`
 }
 
-func ReadBytes(reader *bio.Reader) *Query {
+func ReadBytes(b []byte) (offset int, q *Query) {
 	name := []byte{}
 	for {
-		lenByte, err := reader.ReadByte()
-		if err != nil {
-			log.Panic(err)
-		}
+		lenByte := b[offset]
+		offset++
 		l := int(lenByte)
 		if l == 0 {
 			break
@@ -48,26 +42,19 @@ func ReadBytes(reader *bio.Reader) *Query {
 		if len(name) > 0 {
 			name = append(name, 0x2e)
 		}
-		buf, err := bufio.ReadNBytes(reader, l)
-		if err != nil {
-			panic(err)
-		}
+		buf := b[offset : offset+l]
 		name = append(name, buf...)
+		offset += l
 	}
 
-	query := &Query{Name: string(name)}
+	q = &Query{Name: string(name)}
 
-	t, err := bufio.ReadNBytes(reader, 2)
-	if err != nil {
-		panic(err)
-	}
-	query.Type = QueryType(binary.BigEndian.Uint16(t))
+	t := b[offset : offset+2]
+	q.Type = QueryType(binary.BigEndian.Uint16(t))
+	offset += 2
 
-	c, err := bufio.ReadNBytes(reader, 2)
-	if err != nil {
-		panic(err)
-	}
-	query.Class = QueryClass(binary.BigEndian.Uint16(c))
+	c := b[offset : offset+2]
+	q.Class = QueryClass(binary.BigEndian.Uint16(c))
 
-	return query
+	return
 }

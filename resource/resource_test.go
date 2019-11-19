@@ -8,7 +8,8 @@ import (
 )
 
 func TestPackDomainName(t *testing.T) {
-	b := packDomainName("fyfe.io")
+	b := make([]byte, 0)
+	packDomainName(&b, "fyfe.io")
 
 	expected := []byte{0x04, 0x66, 0x79, 0x66, 0x65, 0x02, 0x69, 0x6f}
 
