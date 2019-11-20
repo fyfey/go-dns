@@ -1,16 +1,13 @@
 package resource
 
 import (
-	bio "bufio"
-	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
-	"strings"
 
-	"fyfe.io/dns/bufio"
+	"fyfe.io/dns/dnsutils"
 )
 
+// Resource is a resource record
 type Resource struct {
 	Name        string `json:"name"`
 	Type        int    `json:"type"`
@@ -20,71 +17,68 @@ type Resource struct {
 	RData       string `json:"rdata"`
 }
 
-func (r *Resource) ReadBytes(reader *bio.Reader) *Resource {
+// NewResource creates a new resource record from raw bytes
+func NewResource(b []byte, offset int) *Resource {
 	name := []byte{}
 	for {
-		lenByte, err := reader.ReadByte()
-		if err != nil {
-			log.Panic(err)
-		}
+		lenByte := b[offset]
 		l := int(lenByte)
+		offset++
 		if l == 0 {
+			// End of name
+			break
+		}
+		if l>>4 == 0xc {
+			// It's a pointer!
+			pointer := binary.BigEndian.Uint16(b[offset-1:offset+1]) & 0xfff
+			name = append(name, []byte(dnsutils.UnpackDomainName(b[pointer:]))...)
+			fmt.Printf("Pointer to %d\n%s\n", pointer, name)
+			offset++
 			break
 		}
 		if len(name) > 0 {
 			name = append(name, 0x2e)
 		}
-		buf, err := bufio.ReadNBytes(reader, l)
-		if err != nil {
-			panic(err)
-		}
-		name = append(name, buf...)
+		name = append(name, b[offset:offset+l]...)
+		offset += l
 	}
 
 	resource := &Resource{Name: string(name)}
 
-	t, err := bufio.ReadNBytes(reader, 2)
-	if err != nil {
-		panic(err)
-	}
-	resource.Type = int(binary.BigEndian.Uint16(t))
+	resource.Type = int(binary.BigEndian.Uint16(b[offset : offset+2]))
+	offset += 2
 
-	c, err := bufio.ReadNBytes(reader, 2)
-	if err != nil {
-		panic(err)
-	}
-	resource.Class = int(binary.BigEndian.Uint16(c))
+	resource.Class = int(binary.BigEndian.Uint16(b[offset : offset+2]))
+	offset += 2
 
-	ttl, err := bufio.ReadNBytes(reader, 4)
-	if err != nil {
-		panic(err)
+	resource.TTL = int(binary.BigEndian.Uint32(b[offset : offset+4]))
+	offset += 4
+
+	resource.RDataLength = int(binary.BigEndian.Uint16(b[offset : offset+2]))
+	offset += 2
+
+	address := ""
+	for i := offset; i < offset+resource.RDataLength; i++ {
+		address = fmt.Sprintf("%s%d", address, b[i])
+		if i < offset+resource.RDataLength-1 {
+			address += "."
+		}
 	}
-	resource.TTL = int(binary.BigEndian.Uint16(ttl))
+	resource.RData = string(address)
 
 	return resource
 }
 
-func packDomainName(b *[]byte, name string) {
-	parts := strings.Split(name, ".")
+func (r *Resource) Marshal() []byte {
+	b := make([]byte, 0)
 
-	for i := 0; i < len(parts); i++ {
-		*b = append(*b, byte(len(parts[i])))
-		*b = append(*b, []byte(parts[i])...)
-	}
-}
+	offset := dnsutils.PackDomainName(&b, r.Name)
+	b = append(b, make([]byte, 8)...)
+	binary.BigEndian.PutUint16(b[offset:], uint16(r.Type))
+	binary.BigEndian.PutUint16(b[offset+2:], uint16(r.Class))
+	binary.BigEndian.PutUint32(b[offset+4:], uint32(r.TTL))
+	b = append(b, byte(r.RDataLength))
+	dnsutils.PackIPAddress(&b, r.RData)
 
-func unpackDomainName(b []byte) string {
-	offset := 0
-	parts := [][]byte{}
-	for {
-		len := int(b[offset])
-		fmt.Printf("Len :%d\n", len)
-		if len == 0 {
-			break
-		}
-		parts = append(parts, b[offset+1:offset+len+1])
-		offset += int(len) + 1
-	}
-
-	return string(bytes.Join(parts, []byte{0x2e}))
+	return b
 }
