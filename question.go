@@ -1,4 +1,4 @@
-package query
+package main
 
 import (
 	"encoding/binary"
@@ -24,30 +24,16 @@ const (
 	IN                  = 1
 )
 
-type Query struct {
+type Question struct {
 	Name  string     `json:"name"`
 	Type  QueryType  `json:"type"`
 	Class QueryClass `json:"class"`
 }
 
-func ReadBytes(b []byte) (offset int, q *Query) {
-	name := []byte{}
-	for {
-		lenByte := b[offset]
-		offset++
-		l := int(lenByte)
-		if l == 0 {
-			break
-		}
-		if len(name) > 0 {
-			name = append(name, 0x2e)
-		}
-		buf := b[offset : offset+l]
-		name = append(name, buf...)
-		offset += l
-	}
+func NewQuestion(b []byte) (offset int, q *Question) {
+	offset, name := UnpackDomainName(b)
 
-	q = &Query{Name: string(name)}
+	q = &Question{Name: name}
 
 	t := b[offset : offset+2]
 	q.Type = QueryType(binary.BigEndian.Uint16(t))
@@ -57,4 +43,15 @@ func ReadBytes(b []byte) (offset int, q *Query) {
 	q.Class = QueryClass(binary.BigEndian.Uint16(c))
 
 	return
+}
+
+func (q *Question) Marshal() []byte {
+	b := make([]byte, 0)
+
+	offset := PackDomainName(&b, q.Name)
+	b = append(b, 0x00, 0x00, 0x00, 0x00)
+	binary.BigEndian.PutUint16(b[offset:], uint16(q.Type))
+	binary.BigEndian.PutUint16(b[offset+2:], uint16(q.Class))
+
+	return b
 }

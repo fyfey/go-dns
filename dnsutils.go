@@ -1,4 +1,4 @@
-package dnsutils
+package main
 
 import (
 	"bytes"
@@ -17,27 +17,31 @@ func PackDomainName(b *[]byte, name string) int {
 		*b = append(*b, []byte(parts[i])...)
 		n += len(parts[i]) + 1
 	}
+	*b = append(*b, 0x00)
+	n++
 
 	return n
 }
 
 // UnpackDomainName unpacks domain name from b
-func UnpackDomainName(b []byte) string {
+func UnpackDomainName(b []byte) (int, string) {
 	offset := 0
 	parts := [][]byte{}
 	for {
 		len := int(b[offset])
 		fmt.Printf("Len :%d\n", len)
+		offset++
 		if len == 0 {
 			break
 		}
-		parts = append(parts, b[offset+1:offset+len+1])
-		offset += int(len) + 1
+		parts = append(parts, b[offset:offset+len])
+		offset += int(len)
 	}
 
-	return string(bytes.Join(parts, []byte{0x2e}))
+	return offset, string(bytes.Join(parts, []byte{0x2e}))
 }
 
+// PackIPAddress writes address to b
 func PackIPAddress(b *[]byte, address string) {
 	parts := strings.Split(address, ".")
 	for _, p := range parts {

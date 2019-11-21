@@ -73,11 +73,11 @@ func clearBit(n int, pos uint) int {
 	return n
 }
 
-func MarshalHeader(h *Header) []byte {
+func (h *Header) Marshal() []byte {
 	b := make([]byte, 12)
 
-	fmt.Printf("ID: %x", uint16(h.ID))
-	binary.BigEndian.PutUint16(b[0:4], uint16(h.ID))
+	fmt.Printf("ID: %x, %d", uint16(h.ID), h.ID)
+	binary.BigEndian.PutUint16(b[0:2], uint16(h.ID))
 
 	header0 := 0
 	binary.BigEndian.PutUint16(b[2:], uint16(h.Opcode<<3))
@@ -96,8 +96,7 @@ func MarshalHeader(h *Header) []byte {
 
 	b[2] = byte(header0)
 
-	header3 := 0
-	header3 &= h.ReturnCode
+	header3 := h.ReturnCode
 	if h.RecursionAvailable {
 		header3 = setBit(header3, 7)
 	}

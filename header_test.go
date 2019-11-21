@@ -75,7 +75,7 @@ func TestToBytes(t *testing.T) {
 	}
 	expected := []byte{0x73, 0x48, 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
 
-	b := MarshalHeader(header)
+	b := header.Marshal()
 
 	if !bytes.Equal(b, expected) {
 		t.Errorf("Expected:\n%s\nGot:\n%s", hex.Dump(expected), hex.Dump(b))
